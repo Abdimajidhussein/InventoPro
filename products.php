@@ -1,7 +1,198 @@
 <?php
-// Set current page (this would be set in each page file)
-$currentPage = 'products'; // This should be set in each individual page
+// Include config file
+require_once "includes/config.php";
+
+// Initialize variables
+$name = $description = $category = $price = $stock = $unit = $sku = "";
+$id = 0;
+$edit_mode = false;
+$message = "";
+$message_type = "";
+
+// Process form data when submitted
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // Get hidden input value if editing
+    if (isset($_POST["id"])) {
+        $id = (int)$_POST["id"];
+    }
+
+    // Collect errors
+    $errors = [];
+
+    // Validate name
+    $name = trim($_POST["name"]);
+    if (empty($name)) {
+        $errors[] = "Please enter a product name.";
+    }
+
+    // Validate SKU
+    $sku = trim($_POST["sku"]);
+    if (empty($sku)) {
+        $errors[] = "Please enter a SKU.";
+    }
+
+    // Validate category
+    $category = trim($_POST["category"]);
+    if (empty($category)) {
+        $errors[] = "Please select a category.";
+    }
+
+    // Validate price
+    $price = trim($_POST["price"]);
+    if (!is_numeric($price) || $price <= 0) {
+        $errors[] = "Please enter a valid price.";
+    }
+
+    // Validate stock
+    $stock = trim($_POST["stock"]);
+    if (!is_numeric($stock) || $stock < 0) {
+        $errors[] = "Please enter a valid stock quantity.";
+    }
+
+    // Validate unit
+    $unit = trim($_POST["unit"]);
+    if (empty($unit)) {
+        $errors[] = "Please select a unit of measurement.";
+    }
+
+    $description = trim($_POST["description"]);
+
+    // Check input errors before inserting in database
+    if (empty($errors)) {
+        if ($id > 0) {
+            // Update existing record
+            $sql = "UPDATE products SET name=?, description=?, category=?, price=?, stock=?, unit=?, sku=? WHERE id=?";
+
+            if ($stmt = $conn->prepare($sql)) {
+                $stmt->bind_param("ssssdssi", $param_name, $param_description, $param_category, $param_price, $param_stock, $param_unit, $param_sku, $param_id);
+
+                // Set parameters
+                $param_name = $name;
+                $param_description = $description;
+                $param_category = $category;
+                $param_price = $price;
+                $param_stock = $stock;
+                $param_unit = $unit;
+                $param_sku = $sku;
+                $param_id = $id;
+
+                if ($stmt->execute()) {
+                    $message = "Product updated successfully.";
+                    $message_type = "success";
+                    $edit_mode = false;
+                } else {
+                    $message = "Error updating product: " . $stmt->error;
+                    $message_type = "error";
+                }
+                $stmt->close();
+            }
+        } else {
+            // Insert new record
+            $sql = "INSERT INTO products (name, description, category, price, stock, unit, sku) VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+            if ($stmt = $conn->prepare($sql)) {
+                $stmt->bind_param("ssssdss", $param_name, $param_description, $param_category, $param_price, $param_stock, $param_unit, $param_sku);
+
+                // Set parameters
+                $param_name = $name;
+                $param_description = $description;
+                $param_category = $category;
+                $param_price = $price;
+                $param_stock = $stock;
+                $param_unit = $unit;
+                $param_sku = $sku;
+
+                if ($stmt->execute()) {
+                    $message = "Product added successfully.";
+                    $message_type = "success";
+                    // Reset form
+                    $name = $description = $category = $price = $stock = $unit = $sku = "";
+                } else {
+                    $message = "Error adding product: " . $stmt->error;
+                    $message_type = "error";
+                }
+                $stmt->close();
+            }
+        }
+    } else {
+        $message = implode("<br>", $errors);
+        $message_type = "error";
+    }
+}
+
+// Process delete action
+if (isset($_GET["delete"])) {
+    $id = (int)$_GET["delete"];
+    
+    // Prepare a delete statement
+    $sql = "DELETE FROM products WHERE id = ?";
+    
+    if ($stmt = $conn->prepare($sql)) {
+        $stmt->bind_param("i", $param_id);
+        $param_id = $id;
+        
+        if ($stmt->execute()) {
+            $message = "Product deleted successfully.";
+            $message_type = "success";
+        } else {
+            $message = "Error deleting product: " . $stmt->error;
+            $message_type = "error";
+        }
+        $stmt->close();
+    }
+}
+
+// Process edit action
+if (isset($_GET["edit"])) {
+    $id = (int)$_GET["edit"];
+    
+    // Prepare a select statement
+    $sql = "SELECT * FROM products WHERE id = ?";
+    
+    if ($stmt = $conn->prepare($sql)) {
+        $stmt->bind_param("i", $param_id);
+        $param_id = $id;
+        
+        if ($stmt->execute()) {
+            $result = $stmt->get_result();
+            
+            if ($result->num_rows == 1) {
+                $row = $result->fetch_assoc();
+                $id = $row["id"];
+                $name = $row["name"];
+                $description = $row["description"];
+                $category = $row["category"];
+                $price = $row["price"];
+                $stock = $row["stock"];
+                $unit = $row["unit"];
+                $sku = $row["sku"];
+                $edit_mode = true;
+            } else {
+                $message = "Product not found.";
+                $message_type = "error";
+            }
+        } else {
+            $message = "Error retrieving product: " . $stmt->error;
+            $message_type = "error";
+        }
+        $stmt->close();
+    }
+}
+
+// Get all products
+$sql = "SELECT * FROM products ORDER BY created_at DESC";
+$products = [];
+if ($result = $conn->query($sql)) {
+    while ($row = $result->fetch_assoc()) {
+        $products[] = $row;
+    }
+    $result->free();
+}
+
+// Close connection
+$conn->close();
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -97,8 +288,6 @@ $currentPage = 'products'; // This should be set in each individual page
             cursor: pointer;
             font-size: 16px;
             border-left: 4px solid transparent;
-            text-decoration: none;
-            color: white;
         }
 
         .menu-item:hover {
@@ -227,6 +416,109 @@ $currentPage = 'products'; // This should be set in each individual page
             color: var(--primary);
         }
 
+        /* Product Form */
+        .product-form-container {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 30px;
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+        }
+
+        .form-title {
+            font-size: 22px;
+            margin-bottom: 25px;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            margin: 0 -15px;
+        }
+
+        .form-group {
+            flex: 1 0 300px;
+            padding: 0 15px;
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--dark);
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--light-gray);
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            transition: var(--transition);
+        }
+
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--light-gray);
+        }
+
+        .btn {
+            padding: 12px 25px;
+            border-radius: var(--border-radius);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--light-gray);
+            color: var(--dark);
+        }
+
+        .btn-secondary:hover {
+            background: #dcdcdc;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+
         /* Products Table */
         .products-container {
             background: white;
@@ -251,6 +543,7 @@ $currentPage = 'products'; // This should be set in each individual page
         .products-table {
             width: 100%;
             border-collapse: collapse;
+            min-width: 800px;
         }
 
         .products-table th {
@@ -308,6 +601,49 @@ $currentPage = 'products'; // This should be set in each individual page
             color: white;
         }
 
+        .stock-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .in-stock { background: rgba(76, 175, 80, 0.2); color: var(--success); }
+        .low-stock { background: rgba(255, 152, 0, 0.2); color: var(--warning); }
+        .out-of-stock { background: rgba(244, 67, 54, 0.2); color: var(--danger); }
+
+        /* Message Alerts */
+        .message-container {
+            margin-bottom: 25px;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .alert-success {
+            background: rgba(76, 175, 80, 0.2);
+            border-left: 4px solid var(--success);
+            color: var(--success);
+        }
+
+        .alert-error {
+            background: rgba(244, 67, 54, 0.2);
+            border-left: 4px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .alert i {
+            font-size: 20px;
+        }
+
         /* Responsive Design */
         @media (max-width: 992px) {
             .search-box input {
@@ -328,6 +664,10 @@ $currentPage = 'products'; // This should be set in each individual page
                 margin-left: 0;
             }
             
+            .form-group {
+                flex: 1 0 100%;
+            }
+            
             .search-box {
                 display: none;
             }
@@ -340,6 +680,14 @@ $currentPage = 'products'; // This should be set in each individual page
             
             .dashboard-content {
                 padding: 20px 15px;
+            }
+            
+            .form-actions {
+                flex-direction: column;
+            }
+            
+            .form-actions .btn {
+                width: 100%;
             }
         }
     </style>
@@ -356,38 +704,38 @@ $currentPage = 'products'; // This should be set in each individual page
             </div>
             
             <div class="sidebar-menu">
-                <a href="dashboard.php" class="menu-item <?= ($currentPage === 'dashboard') ? 'active' : '' ?>">
+                <div class="menu-item">
                     <i class="fas fa-home menu-icon"></i>
                     <span>Dashboard</span>
-                </a>
-                <a href="products.php" class="menu-item <?= ($currentPage === 'products') ? 'active' : '' ?>">
+                </div>
+                <div class="menu-item active">
                     <i class="fas fa-box menu-icon"></i>
                     <span>Products</span>
-                </a>
-                <a href="categories.php" class="menu-item <?= ($currentPage === 'categories') ? 'active' : '' ?>">
+                </div>
+                <div class="menu-item">
                     <i class="fas fa-tags menu-icon"></i>
                     <span>Categories</span>
-                </a>
-                <a href="inventory.php" class="menu-item <?= ($currentPage === 'inventory') ? 'active' : '' ?>">
+                </div>
+                <div class="menu-item">
                     <i class="fas fa-warehouse menu-icon"></i>
                     <span>Inventory</span>
-                </a>
-                <a href="orders.php" class="menu-item <?= ($currentPage === 'orders') ? 'active' : '' ?>">
+                </div>
+                <div class="menu-item">
                     <i class="fas fa-shopping-cart menu-icon"></i>
                     <span>Orders</span>
-                </a>
-                <a href="analytics.php" class="menu-item <?= ($currentPage === 'analytics') ? 'active' : '' ?>">
+                </div>
+                <div class="menu-item">
                     <i class="fas fa-chart-line menu-icon"></i>
                     <span>Analytics</span>
-                </a>
-                <a href="suppliers.php" class="menu-item <?= ($currentPage === 'suppliers') ? 'active' : '' ?>">
+                </div>
+                <div class="menu-item">
                     <i class="fas fa-users menu-icon"></i>
                     <span>Suppliers</span>
-                </a>
-                <a href="settings.php" class="menu-item <?= ($currentPage === 'settings') ? 'active' : '' ?>">
+                </div>
+                <div class="menu-item">
                     <i class="fas fa-cog menu-icon"></i>
                     <span>Settings</span>
-                </a>
+                </div>
             </div>
         </div>
         
@@ -424,12 +772,114 @@ $currentPage = 'products'; // This should be set in each individual page
                     Product Management
                 </h1>
                 
+                <!-- Message Alerts -->
+                <?php if (!empty($message)): ?>
+                <div class="message-container">
+                    <div class="alert <?php echo ($message_type == 'success') ? 'alert-success' : 'alert-error'; ?>">
+                        <i class="fas <?php echo ($message_type == 'success') ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
+                        <span><?php echo $message; ?></span>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <!-- Product Form -->
+                <div class="product-form-container">
+                    <h2 class="form-title">
+                        <i class="fas <?php echo $edit_mode ? 'fa-edit' : 'fa-plus-circle'; ?>"></i>
+                        <?php echo $edit_mode ? 'Edit Product' : 'Add New Product'; ?>
+                    </h2>
+                    
+                    <form action="products.php" method="POST">
+                        <input type="hidden" name="id" value="<?php echo $edit_mode ? $id : ''; ?>">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="name">Product Name *</label>
+                                <input type="text" id="name" name="name" required
+                                       value="<?php echo htmlspecialchars($name); ?>"
+                                       placeholder="Enter product name">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="sku">SKU (Stock Keeping Unit) *</label>
+                                <input type="text" id="sku" name="sku" required
+                                       value="<?php echo htmlspecialchars($sku); ?>"
+                                       placeholder="Enter unique SKU">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="category">Category *</label>
+                                <select id="category" name="category" required>
+                                    <option value="">Select category</option>
+                                    <option value="Electronics" <?php echo ($category == 'Electronics') ? 'selected' : ''; ?>>Electronics</option>
+                                    <option value="Clothing" <?php echo ($category == 'Clothing') ? 'selected' : ''; ?>>Clothing</option>
+                                    <option value="Home & Kitchen" <?php echo ($category == 'Home & Kitchen') ? 'selected' : ''; ?>>Home & Kitchen</option>
+                                    <option value="Books" <?php echo ($category == 'Books') ? 'selected' : ''; ?>>Books</option>
+                                    <option value="Beauty" <?php echo ($category == 'Beauty') ? 'selected' : ''; ?>>Beauty</option>
+                                    <option value="Sports" <?php echo ($category == 'Sports') ? 'selected' : ''; ?>>Sports</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="price">Price ($) *</label>
+                                <input type="number" id="price" name="price" step="0.01" min="0" required
+                                       value="<?php echo htmlspecialchars($price); ?>"
+                                       placeholder="Enter price">
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="stock">Stock Quantity *</label>
+                                <input type="number" id="stock" name="stock" step="0.001" min="0" required
+                                       value="<?php echo htmlspecialchars($stock); ?>"
+                                       placeholder="Enter quantity">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="unit">Unit of Measurement *</label>
+                                <select id="unit" name="unit" required>
+                                    <option value="">Select unit</option>
+                                    <option value="pcs" <?php echo ($unit == 'pcs') ? 'selected' : ''; ?>>Pieces (pcs)</option>
+                                    <option value="kg" <?php echo ($unit == 'kg') ? 'selected' : ''; ?>>Kilograms (kg)</option>
+                                    <option value="g" <?php echo ($unit == 'g') ? 'selected' : ''; ?>>Grams (g)</option>
+                                    <option value="L" <?php echo ($unit == 'L') ? 'selected' : ''; ?>>Liters (L)</option>
+                                    <option value="mL" <?php echo ($unit == 'mL') ? 'selected' : ''; ?>>Milliliters (mL)</option>
+                                    <option value="m" <?php echo ($unit == 'm') ? 'selected' : ''; ?>>Meters (m)</option>
+                                    <option value="cm" <?php echo ($unit == 'cm') ? 'selected' : ''; ?>>Centimeters (cm)</option>
+                                    <option value="box" <?php echo ($unit == 'box') ? 'selected' : ''; ?>>Boxes</option>
+                                    <option value="pack" <?php echo ($unit == 'pack') ? 'selected' : ''; ?>>Packs</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="description">Description</label>
+                                <textarea id="description" name="description" placeholder="Enter product description"><?php echo htmlspecialchars($description); ?></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <?php if ($edit_mode): ?>
+                                <a href="products.php" class="btn btn-secondary">Cancel</a>
+                            <?php endif; ?>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas <?php echo $edit_mode ? 'fa-save' : 'fa-plus'; ?>"></i>
+                                <?php echo $edit_mode ? 'Update Product' : 'Add Product'; ?>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
                 <!-- Products Table -->
                 <div class="products-container">
                     <div class="table-header">
                         <h2 class="table-title">All Products</h2>
                         <div class="table-actions">
-                            <span>15 products found</span>
+                            <span><?php echo count($products); ?> products found</span>
                         </div>
                     </div>
                     
@@ -437,102 +887,70 @@ $currentPage = 'products'; // This should be set in each individual page
                         <thead>
                             <tr>
                                 <th>Product</th>
+                                <th>SKU</th>
                                 <th>Category</th>
                                 <th>Price</th>
                                 <th>Stock</th>
+                                <th>Unit</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>
-                                    <strong>Wireless Headphones Pro</strong>
-                                    <div class="text-muted" style="font-size: 14px; margin-top: 5px;">
-                                        Noise-cancelling headphones with 30-hour battery
-                                    </div>
-                                </td>
-                                <td>Electronics</td>
-                                <td>$129.99</td>
-                                <td>48</td>
-                                <td><span style="padding: 5px 10px; background: rgba(76, 175, 80, 0.2); color: #4caf50; border-radius: 20px;">In Stock</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="action-btn edit-btn" title="Edit">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="action-btn delete-btn" title="Delete">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <strong>Smartphone X - 128GB</strong>
-                                    <div class="text-muted" style="font-size: 14px; margin-top: 5px;">
-                                        Latest smartphone with 128GB storage
-                                    </div>
-                                </td>
-                                <td>Electronics</td>
-                                <td>$899.99</td>
-                                <td>12</td>
-                                <td><span style="padding: 5px 10px; background: rgba(255, 152, 0, 0.2); color: #ff9800; border-radius: 20px;">Low Stock</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="action-btn edit-btn" title="Edit">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="action-btn delete-btn" title="Delete">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <strong>Bluetooth Speaker</strong>
-                                    <div class="text-muted" style="font-size: 14px; margin-top: 5px;">
-                                        Portable speaker with 20W output
-                                    </div>
-                                </td>
-                                <td>Audio</td>
-                                <td>$59.99</td>
-                                <td>3</td>
-                                <td><span style="padding: 5px 10px; background: rgba(255, 152, 0, 0.2); color: #ff9800; border-radius: 20px;">Low Stock</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="action-btn edit-btn" title="Edit">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="action-btn delete-btn" title="Delete">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <strong>Gaming Keyboard RGB</strong>
-                                    <div class="text-muted" style="font-size: 14px; margin-top: 5px;">
-                                        Mechanical keyboard with RGB lighting
-                                    </div>
-                                </td>
-                                <td>Computers</td>
-                                <td>$79.99</td>
-                                <td>0</td>
-                                <td><span style="padding: 5px 10px; background: rgba(244, 67, 54, 0.2); color: #f44336; border-radius: 20px;">Out of Stock</span></td>
-                                <td>
-                                    <div class="action-buttons">
-                                        <button class="action-btn edit-btn" title="Edit">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="action-btn delete-btn" title="Delete">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <?php if (count($products) > 0): ?>
+                                <?php foreach ($products as $product): 
+                                    // Determine stock status
+                                    $stock_value = (float)$product['stock'];
+                                    $status_class = '';
+                                    $status_text = '';
+                                    
+                                    if ($stock_value > 20) {
+                                        $status_class = 'in-stock';
+                                        $status_text = 'In Stock';
+                                    } elseif ($stock_value > 0) {
+                                        $status_class = 'low-stock';
+                                        $status_text = 'Low Stock';
+                                    } else {
+                                        $status_class = 'out-of-stock';
+                                        $status_text = 'Out of Stock';
+                                    }
+                                ?>
+                                <tr>
+                                    <td>
+                                        <strong><?php echo htmlspecialchars($product['name']); ?></strong>
+                                        <div class="text-muted" style="font-size: 14px; margin-top: 5px;">
+                                            <?php echo substr(htmlspecialchars($product['description']), 0, 50) . (strlen($product['description']) > 50 ? '...' : ''); ?>
+                                        </div>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($product['sku']); ?></td>
+                                    <td><?php echo htmlspecialchars($product['category']); ?></td>
+                                    <td>$<?php echo number_format($product['price'], 2); ?></td>
+                                    <td><?php echo number_format($product['stock'], 3); ?></td>
+                                    <td><?php echo htmlspecialchars($product['unit']); ?></td>
+                                    <td>
+                                        <span class="stock-status <?php echo $status_class; ?>"><?php echo $status_text; ?></span>
+                                    </td>
+                                    <td>
+                                        <div class="action-buttons">
+                                            <a href="products.php?edit=<?php echo $product['id']; ?>" class="action-btn edit-btn" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="products.php?delete=<?php echo $product['id']; ?>" class="action-btn delete-btn" title="Delete" onclick="return confirm('Are you sure you want to delete this product?');">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="8" style="text-align: center; padding: 40px;">
+                                        <i class="fas fa-box-open" style="font-size: 48px; color: #e0e0e0; margin-bottom: 20px;"></i>
+                                        <h3 style="color: var(--gray); font-weight: 400;">No products found</h3>
+                                        <p style="color: var(--gray);">Add your first product using the form above</p>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -545,6 +963,22 @@ $currentPage = 'products'; // This should be set in each individual page
         document.querySelector('.toggle-sidebar').addEventListener('click', function() {
             document.querySelector('.sidebar').classList.toggle('active');
         });
+        
+        // Add active class to menu items
+        const menuItems = document.querySelectorAll('.menu-item');
+        menuItems.forEach(item => {
+            item.addEventListener('click', function() {
+                menuItems.forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+        
+        // Scroll to form when editing
+        <?php if ($edit_mode): ?>
+            document.querySelector('.product-form-container').scrollIntoView({
+                behavior: 'smooth'
+            });
+        <?php endif; ?>
     </script>
 </body>
 </html>
