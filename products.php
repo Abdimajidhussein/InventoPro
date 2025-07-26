@@ -1,6 +1,7 @@
 <?php
 // Include config file
 require_once "includes/config.php";
+require_once "includes/sidebar.php";
 
 // Initialize variables
 $name = $description = $category = $price = $stock = $unit = $sku = "";
@@ -185,6 +186,16 @@ $products = [];
 if ($result = $conn->query($sql)) {
     while ($row = $result->fetch_assoc()) {
         $products[] = $row;
+    }
+    $result->free();
+}
+
+// Get all categories for dropdown
+$sql = "SELECT * FROM categories ORDER BY name ASC";
+$categories_list = [];
+if ($result = $conn->query($sql)) {
+    while ($row = $result->fetch_assoc()) {
+        $categories_list[] = $row;
     }
     $result->free();
 }
@@ -694,50 +705,7 @@ $conn->close();
 </head>
 <body>
     <div class="dashboard-container">
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <i class="fas fa-boxes logo-icon"></i>
-                    <span class="logo-text">InventoPro</span>
-                </div>
-            </div>
-            
-            <div class="sidebar-menu">
-                <div class="menu-item">
-                    <i class="fas fa-home menu-icon"></i>
-                    <span>Dashboard</span>
-                </div>
-                <div class="menu-item active">
-                    <i class="fas fa-box menu-icon"></i>
-                    <span>Products</span>
-                </div>
-                <div class="menu-item">
-                    <i class="fas fa-tags menu-icon"></i>
-                    <span>Categories</span>
-                </div>
-                <div class="menu-item">
-                    <i class="fas fa-warehouse menu-icon"></i>
-                    <span>Inventory</span>
-                </div>
-                <div class="menu-item">
-                    <i class="fas fa-shopping-cart menu-icon"></i>
-                    <span>Orders</span>
-                </div>
-                <div class="menu-item">
-                    <i class="fas fa-chart-line menu-icon"></i>
-                    <span>Analytics</span>
-                </div>
-                <div class="menu-item">
-                    <i class="fas fa-users menu-icon"></i>
-                    <span>Suppliers</span>
-                </div>
-                <div class="menu-item">
-                    <i class="fas fa-cog menu-icon"></i>
-                    <span>Settings</span>
-                </div>
-            </div>
-        </div>
+        
         
         <!-- Main Content -->
         <div class="main-content">
@@ -813,12 +781,11 @@ $conn->close();
                                 <label for="category">Category *</label>
                                 <select id="category" name="category" required>
                                     <option value="">Select category</option>
-                                    <option value="Electronics" <?php echo ($category == 'Electronics') ? 'selected' : ''; ?>>Electronics</option>
-                                    <option value="Clothing" <?php echo ($category == 'Clothing') ? 'selected' : ''; ?>>Clothing</option>
-                                    <option value="Home & Kitchen" <?php echo ($category == 'Home & Kitchen') ? 'selected' : ''; ?>>Home & Kitchen</option>
-                                    <option value="Books" <?php echo ($category == 'Books') ? 'selected' : ''; ?>>Books</option>
-                                    <option value="Beauty" <?php echo ($category == 'Beauty') ? 'selected' : ''; ?>>Beauty</option>
-                                    <option value="Sports" <?php echo ($category == 'Sports') ? 'selected' : ''; ?>>Sports</option>
+                                    <?php foreach ($categories_list as $cat): ?>
+                                        <option value="<?php echo $cat['id']; ?>" <?php echo ($category == $cat['id']) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($cat['name']); ?>
+                                        </option>
+                                    <?php endforeach; ?>
                                 </select>
                             </div>
                             
