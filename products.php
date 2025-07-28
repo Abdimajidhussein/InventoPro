@@ -1,9 +1,9 @@
 <?php
-// Include config file
+// the congig file and the sidebar
 require_once "includes/config.php";
 require_once "includes/sidebar.php";
 
-// Initialize variables
+// Initializing my variables
 $name = $description = $category = $price = $stock = $unit = $sku = "";
 $id = 0;
 $edit_mode = false;
@@ -17,22 +17,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $id = (int)$_POST["id"];
     }
 
-    // Collect errors
+    // Collecting the errors
     $errors = [];
 
-    // Validate name
+    // Validating the name
     $name = trim($_POST["name"]);
     if (empty($name)) {
         $errors[] = "Please enter a product name.";
     }
 
-    // Validate SKU
+    // Validating SKU
     $sku = trim($_POST["sku"]);
     if (empty($sku)) {
         $errors[] = "Please enter a SKU.";
     }
 
-    // Validate category
+    // Validating category
     $category = trim($_POST["category"]);
     if (empty($category)) {
         $errors[] = "Please select a category.";
@@ -88,7 +88,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $stmt->close();
             }
         } else {
-            // Insert new record
+            // Inserting new record
             $sql = "INSERT INTO products (name, description, category, price, stock, unit, sku) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
             if ($stmt = $conn->prepare($sql)) {
